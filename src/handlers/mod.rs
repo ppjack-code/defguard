@@ -92,6 +92,7 @@ impl From<WebError> for ApiResponse {
             ),
             WebError::IncorrectUsername(msg)
             | WebError::PubkeyValidation(msg)
+            | WebError::PubkeyExists(msg)
             | WebError::BadRequest(msg) => {
                 error!(msg);
                 ApiResponse::new(json!({ "msg": msg }), StatusCode::BAD_REQUEST)
@@ -173,17 +174,26 @@ impl AuthCode {
 #[derive(Deserialize, Serialize)]
 pub struct GroupInfo {
     pub name: String,
-    pub members: Option<Vec<String>>,
+    pub members: Vec<String>,
+    pub vpn_locations: Vec<String>,
 }
 
 impl GroupInfo {
     #[must_use]
-    pub fn new<S: Into<String>>(name: S, members: Option<Vec<String>>) -> Self {
+    pub fn new<S: Into<String>>(name: S, members: Vec<String>, vpn_locations: Vec<String>) -> Self {
         Self {
             name: name.into(),
             members,
+            vpn_locations,
         }
     }
+}
+
+/// Dedicated `GroupInfo` variant for group modification operations.
+#[derive(Deserialize, Serialize)]
+pub struct EditGroupInfo {
+    pub name: String,
+    pub members: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize)]

@@ -631,7 +631,7 @@ async fn test_user_add_device() {
     // add device for themselves
     let device_data = AddDevice {
         name: "TestDevice2".into(),
-        wireguard_pubkey: "mgVXE8WcfStoD8mRatHcX5aaQ0DlcpjvPXibHEOr9y8=".into(),
+        wireguard_pubkey: "hNuapt7lOxF93KUqZGUY00oKJxH8LYwwsUVB1uUa0y4=".into(),
     };
     let response = client
         .post("/api/v1/device/admin")
@@ -676,10 +676,19 @@ async fn test_user_add_device() {
         .content
         .contains("Device type:</span> iPhone, OS: iOS 17.1, Mobile Safari"));
 
+    // a device with duplicate pubkey cannot be added
+    let response = client
+        .post("/api/v1/device/hpotter")
+        .header(USER_AGENT, user_agent_header)
+        .json(&device_data)
+        .send()
+        .await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
     // normal user cannot add a device for other users
     let device_data = AddDevice {
         name: "TestDevice3".into(),
-        wireguard_pubkey: "mgVXE8WcfStoD8mRatHcX5aaQ0DlcpjvPXibHEOr9y8=".into(),
+        wireguard_pubkey: "fF9K0tgatZTEJRvzpNUswr0h8HqCIi+v39B45+QZZzE=".into(),
     };
     let response = client
         .post("/api/v1/device/admin")
@@ -706,4 +715,51 @@ async fn test_user_add_device() {
     assert!(mail
         .content
         .contains("Device type:</span> iPhone, OS: iOS 17.1, Mobile Safari"));
+}
+
+#[tokio::test]
+async fn test_disable() {
+    let client = make_client().await;
+
+    let auth = Auth::new("admin", "pass123");
+    let response = client.post("/api/v1/auth").json(&auth).send().await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // get yourself
+    let mut user_details = fetch_user_details(&client, "admin").await;
+    user_details.user.is_active = false;
+
+    // disable yourself
+    let response = client
+        .put("/api/v1/user/admin")
+        .json(&user_details.user)
+        .send()
+        .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    // create user
+    let new_user = AddUserData {
+        username: "adumbledore".into(),
+        last_name: "Dumbledore".into(),
+        first_name: "Albus".into(),
+        email: "a.dumbledore@hogwart.edu.uk".into(),
+        phone: Some("1234".into()),
+        password: Some("Password1234543$!".into()),
+    };
+    let response = client.post("/api/v1/user").json(&new_user).send().await;
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    // get user
+    let mut user_details = fetch_user_details(&client, "adumbledore").await;
+    assert_eq!(user_details.user.first_name, "Albus");
+
+    // disable user
+    user_details.user.is_active = false;
+    let response = client
+        .put("/api/v1/user/adumbledore")
+        .json(&user_details.user)
+        .send()
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
 }
